@@ -1,0 +1,280 @@
+### Variables
+@baseUrl = http://localhost:9004/api/v1
+@token = {{access_token}}
+
+### TC01 - Giao đơn thi công thành công (Happy Path)
+PATCH {{baseUrl}}/construction/eae87df0-7f02-47b9-baa2-ac2bc9ea61fb
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "formCode": "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a13",
+  "formNumber": "FORM-2024-0003",
+  "contractId": "adsfasdvaerg"
+}
+
+> {%
+client.test("Status is 200", function() {
+  client.assert(response.status === 200);
+});
+%}
+
+
+### TC02 - Giao thi công cho nhân viên sai vai trò (400)
+PATCH {{baseUrl}}/construction/EMP-IT-001
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "formCode": "LĐN",
+  "formNumber": "2024/001",
+  "contractId": "CONT-001"
+}
+
+> {%
+client.test("Status is 400", function() {
+  client.assert(response.status === 400);
+});
+%}
+
+
+### TC03 - Thiếu trường bắt buộc formCode (400)
+PATCH {{baseUrl}}/construction/EMP-STF-001
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "formNumber": "2024/001",
+  "customerId": "CUST-001",
+  "contractId": "CONT-001"
+}
+
+> {%
+client.test("Status is 400", function() {
+  client.assert(response.status === 400);
+});
+%}
+
+
+### TC04 - Mã hợp đồng không tồn tại (400)
+PATCH {{baseUrl}}/construction/EMP-STF-001
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "formCode": "LĐN",
+  "formNumber": "2024/001",
+  "customerId": "CUST-001",
+  "contractId": "NON-EXISTENT"
+}
+
+> {%
+client.test("Status is 400", function() {
+  client.assert(response.status === 400);
+});
+%}
+
+
+### TC05 - Cập nhật nhân viên cho đơn chờ thi công thành công (200)
+PATCH {{baseUrl}}/construction/pending-requests/7a8192a3-7000-4aaa-9bbb-cccccccc0001/eae87df0-7f02-47b9-baa2-ac2bc9ea61fb
+Authorization: Bearer {{token}}
+
+> {%
+client.test("Status is 200", function() {
+  client.assert(response.status === 200);
+});
+%}
+
+
+### TC06 - Cập nhật đơn chờ với ID không tồn tại (404/400)
+PATCH {{baseUrl}}/construction/pending-requests/INVALID-ID/EMP-STF-002
+Authorization: Bearer {{token}}
+
+> {%
+client.test("Status is 400 or 404", function() {
+  client.assert(response.status === 400 || response.status === 404);
+});
+%}
+
+
+### TC07 - Tấn công SQL Injection vào ID nhân viên (400)
+PATCH {{baseUrl}}/construction/' OR 1=1 --
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "formCode": "LĐN",
+  "formNumber": "001",
+  "customerId": "C1",
+  "contractId": "C1"
+}
+
+> {%
+client.test("Status should be error", function() {
+  client.assert(response.status >= 400);
+});
+%}
+
+
+### TC08 - Truy cập không có Token (401)
+PATCH {{baseUrl}}/construction/EMP-STF-001
+Content-Type: application/json
+
+{
+  "formCode": "LĐN",
+  "formNumber": "2024/001",
+  "customerId": "CUST-001",
+  "contractId": "CONT-001"
+}
+
+> {%
+client.test("Status is 401", function() {
+  client.assert(response.status === 401);
+});
+%}
+
+
+### TC09 - Truy cập với quyền hạn không đủ (403)
+PATCH {{baseUrl}}/construction/EMP-STF-001
+Authorization: Bearer {{low_privilege_token}}
+Content-Type: application/json
+
+{
+  "formCode": "LĐN",
+  "formNumber": "2024/001",
+  "customerId": "CUST-001",
+  "contractId": "CONT-001"
+}
+
+> {%
+client.test("Status is 403", function() {
+  client.assert(response.status === 403);
+});
+%}
+
+
+### TC10 - Request Body rỗng (400)
+PATCH {{baseUrl}}/construction/EMP-STF-001
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+> {%
+client.test("Status is 400", function() {
+  client.assert(response.status === 400);
+});
+%}
+
+###
+GET {{baseUrl}}/construction
+Authorization: Bearer {{access_token}}
+
+
+### TC11 - Duyệt đơn chờ thi công thành công (status = true)
+POST {{baseUrl}}/construction/review/7a8192a3-7000-4aaa-9bbb-cccccccc0001/true
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status is 200", function() {
+  client.assert(response.status === 200);
+});
+%}
+
+
+### TC12 - Yêu cầu xem lại đơn chờ thi công (status = false)
+POST {{baseUrl}}/construction/review/7a8192a3-7000-4aaa-9bbb-cccccccc0001/false
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status is 200", function() {
+  client.assert(response.status === 200);
+});
+%}
+
+
+### TC13 - Trạng thái duyệt không hợp lệ (không phải boolean)
+POST {{baseUrl}}/construction/review/7a8192a3-7000-4aaa-9bbb-cccccccc0001/not-boolean
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status is 400", function() {
+  client.assert(response.status === 400);
+});
+%}
+
+
+### TC14 - Thiếu ID của đơn chờ thi công (404)
+POST {{baseUrl}}/construction/review//true
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status is 404", function() {
+  client.assert(response.status === 404);
+});
+%}
+
+
+### TC15 - Thiếu trạng thái duyệt (404/405)
+POST {{baseUrl}}/construction/review/7a8192a3-7000-4aaa-9bbb-cccccccc0001/
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status should be error", function() {
+  client.assert(response.status >= 400);
+});
+%}
+
+
+### TC16 - Truy cập không có Token (401)
+POST {{baseUrl}}/construction/review/7a8192a3-7000-4aaa-9bbb-cccccccc0001/true
+
+> {%
+client.test("Status is 401", function() {
+  client.assert(response.status === 401);
+});
+%}
+
+
+### TC17 - Truy cập với quyền hạn không đủ (403)
+POST {{baseUrl}}/construction/review/7a8192a3-7000-4aaa-9bbb-cccccccc0001/true
+Authorization: Bearer {{low_privilege_token}}
+
+> {%
+client.test("Status is 403", function() {
+  client.assert(response.status === 403);
+});
+%}
+
+
+### TC18 - Tấn công SQL Injection vào ID đơn chờ (400/404)
+POST {{baseUrl}}/construction/review/' OR 1=1 --/true
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status should be error", function() {
+  client.assert(response.status >= 400);
+});
+%}
+
+
+### TC19 - ID đơn chờ thi công không tồn tại (404)
+POST {{baseUrl}}/construction/review/NON-EXISTENT-ID/true
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status is 404", function() {
+  client.assert(response.status === 404);
+});
+%}
+
+
+### TC20 - ID đơn chờ quá dài (Boundary case)
+POST {{baseUrl}}/construction/review/CONST_LONG_ID_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/true
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status should be error", function() {
+  client.assert(response.status >= 400);
+});
+%}

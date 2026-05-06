@@ -1,0 +1,23 @@
+### Variables
+@baseUrl = http://localhost:9003/api/v1
+
+### login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "test",
+  "password": "12345678",
+  "deviceId": "c4793617-640f-4886-905c-7d9a8f4604a7",
+  "deviceInfo": "Chrome on Windows 11",
+  "ipAddress": "127.0.0.1"
+}
+
+### logout
+POST {{keycloak}}/logout
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json
+
+client_id =  &
+client_secret = {{client_secret}} &
+refresh_token = {{refresh_token}}

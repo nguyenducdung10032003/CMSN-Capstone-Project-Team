@@ -1,0 +1,101 @@
+@uri = http://localhost:9004/api/v1/networks
+@keycloak=http://localhost:8080/realms/cmsn/protocol/openid-connect
+@client_secret=
+@id =
+
+### get token
+POST {{keycloak}}/token
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json
+
+grant_type = password &
+client_id =  &
+client_secret = {{client_secret}} &
+username =  &
+password =  &
+scope = openid
+
+> {%
+  client.global.set("access_token", response.body.access_token);
+  client.global.set("refresh_token", response.body.refresh_token);
+%}
+
+### C
+### Create new branch
+POST {{uri}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Namdinh"
+}
+
+### Get list of networks. No params
+GET {{uri}}/networks
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Get list of networks. Pageable
+GET {{uri}}/networks?page=0&size=10
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Get list of networks. Pageable and keyword
+GET {{uri}}/networks?page=0&size=10&keyword=a
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### U
+### blank name
+PUT {{uri}}/{{id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+{
+  "name": ""
+}
+
+### happy case
+PUT {{uri}}/{{id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+{
+  "name": "ueueueueu"
+}
+
+### duplicated name
+PUT {{uri}}/{{id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+{
+  "name": "Nhà máy nước Thủ Đức"
+}
+
+### contain digits, special characters
+PUT {{uri}}/{{id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+{
+  "name": "ghsfg 123 ."
+}
+
+### D
+### not exist
+DELETE {{uri}}/550e8400-e29b-41d4-a716-446655440015
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### happy case
+DELETE {{uri}}/{{id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+Accept: application/json

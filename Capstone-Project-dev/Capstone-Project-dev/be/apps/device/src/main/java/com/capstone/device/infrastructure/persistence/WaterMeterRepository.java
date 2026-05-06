@@ -1,0 +1,13 @@
+package com.capstone.device.infrastructure.persistence;
+
+import com.capstone.device.domain.model.WaterMeter;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface WaterMeterRepository extends JpaRepository<WaterMeter, String> {
+  boolean existsByType_TypeId(String typeTypeId);
+
+  WaterMeter findWaterMeterByMeterId(String id);
+}
+

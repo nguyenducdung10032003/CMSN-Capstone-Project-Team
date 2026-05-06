@@ -1,0 +1,76 @@
+@uri = http://localhost:9004/api/v1/settlements
+
+### Get all settlements - Default (paginated)
+GET {{uri}}
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Get all settlements - With pagination
+GET {{uri}}?page=0&size=10
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Get all settlements - With sorting
+GET {{uri}}?sort=createdAt,desc
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - Search by keyword (matches jobContent, address, note)
+GET {{uri}}/filter?search=road
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - By status
+GET {{uri}}/filter?status=APPROVED
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - By multiple statuses
+GET {{uri}}/filter?status=APPROVED&status=PENDING
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - By registration date range
+GET {{uri}}/filter?registrationFrom=2026-01-01&registrationTo=2026-12-31
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - By connection fee range
+GET {{uri}}/filter?connectionFeeMin=1000000&connectionFeeMax=5000000
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - By creation date range
+GET {{uri}}/filter?createdAtFrom=2026-01-01T00:00:00&createdAtTo=2026-12-31T23:59:59
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - Combined filters (search + status + date range)
+GET {{uri}}/filter?search=construction&status=APPROVED&registrationFrom=2026-01-01&connectionFeeMin=2000000
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - With pagination and sorting
+GET {{uri}}/filter?search=road&page=0&size=5&sort=registrationAt,asc
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - Empty search
+GET {{uri}}/filter?search=
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - Invalid date format (should return 400)
+GET {{uri}}/filter?registrationFrom=invalid-date
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Filter settlements - connectionFeeMin > connectionFeeMax (should return 400)
+GET {{uri}}/filter?connectionFeeMin=5000000&connectionFeeMax=1000000
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Get settlement by ID
+GET {{uri}}/SETTLE-2024-0039
+Authorization: Bearer {{access_token}}
+Accept: application/json

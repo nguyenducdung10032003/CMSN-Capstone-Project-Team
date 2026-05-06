@@ -1,0 +1,164 @@
+import { SVGProps } from "react";
+export * from "./auth/index";
+export * from "./organization/index";
+export * from "./construction/index";
+export * from "./device/index";
+export * from "./customer/index";
+
+export type IconSvgProps = SVGProps<SVGSVGElement> & {
+  size?: number;
+};
+export interface ForgotPasswordFormProps {
+  onSuccessAction: (email: string) => void;
+}
+
+export interface ResetPasswordFormProps {
+  email: string;
+  otp: string;
+}
+
+export interface ApiResponse<T> {
+  status: number;
+  message: string;
+  data: T;
+  timestamp: string;
+}
+
+export interface EmployeeProfileData {
+  id: string;
+  username: string;
+  fullname: string;
+  email: string;
+  phoneNumber: string;
+  gender: string;
+  birthday: string;
+  address: string;
+  avatarUrl: string;
+  role: string;
+  significanceUrl: string;
+  departmentName?: string;
+}
+
+export interface EmployeeProfileUpdatePayload {
+  fullName: string;
+  avatarUrl: string;
+  address: string;
+  phoneNumber: string;
+  gender: string;
+  birthdate: string;
+}
+
+export type DesignProcessingStatus =
+  | "paid"
+  | "processing"
+  | "pending_restore"
+  | "rejected"
+  | "none";
+
+export interface SettlementDocumentRow {
+  id: string;
+  stt: number;
+  code: string;
+  name: string;
+  unit: string;
+  quantity: string;
+  priceVL: string;
+  priceNC: string;
+  totalVL: string;
+  totalNC: string;
+}
+
+export interface StatusDetailData {
+  code: string;
+  address: string;
+  registerDate: string;
+  status: string;
+  creator: string | null;
+  createDate: string | null;
+  approver: string | null;
+  approveDate: string | null;
+  totalPrice: string | null;
+  note: string | null;
+}
+
+export type FieldType =
+  | "input"
+  | "date"
+  | "select"
+  | "search-input"
+  | "search"
+  | "checkbox"
+  | "textarea";
+
+interface BaseField {
+  key: string;
+  label: string;
+  required?: boolean;
+  disabled?: boolean;
+  colSpan?: number;
+}
+
+export interface InputField extends BaseField {
+  type: "input";
+  defaultValue?: string;
+}
+
+export interface DateField extends BaseField {
+  type: "date";
+}
+
+export interface SelectField extends BaseField {
+  type: "select";
+  defaultValue?: string;
+  options: { key: string; label: string }[];
+}
+
+export interface SearchField extends BaseField {
+  type: "search";
+  placeholder?: string;
+  defaultValue?: string;
+  onSearch?: (value: string) => void;
+  debounceMs?: number;
+}
+
+export interface SearchInputField extends BaseField {
+  type: "search-input";
+  onSearchClick?: () => void;
+  defaultValue?: string;
+}
+
+export interface CheckboxField extends BaseField {
+  type: "checkbox";
+  defaultValue?: boolean | string[];
+  checkboxLabel?: string;
+  options?: {
+    key: string;
+    label: string;
+  }[];
+}
+
+export interface TextareaField extends BaseField {
+  type: "textarea";
+  defaultValue?: string;
+  rows?: number;
+  maxLength?: number;
+  placeholder?: string;
+  resize?: "none" | "vertical" | "horizontal" | "both";
+}
+
+export type FormField =
+  | InputField
+  | DateField
+  | SelectField
+  | SearchField
+  | SearchInputField
+  | CheckboxField
+  | TextareaField;
+
+export type OrderStage =
+  | "registration"
+  | "estimate"
+  | "contract"
+  | "construction";
+
+export type OrderStatus = "processing" | "pending" | "approved" | "rejected";

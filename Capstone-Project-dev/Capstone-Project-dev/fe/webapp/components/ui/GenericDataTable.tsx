@@ -1,0 +1,252 @@
+"use client";
+
+import React from "react";
+import {
+  Card,
+  CardBody,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableProps,
+  Spinner,
+  Button,
+} from "@heroui/react";
+import { ChevronDownIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Skeleton } from "@heroui/react";
+import { CustomPagination } from "./custom/CustomPagination";
+import { SortAscIcon, SortDescIcon } from "@/config/chip-and-icon";
+
+interface Column {
+  key: string;
+  label: string | React.ReactNode;
+  sortable?: boolean;
+  align?: "start" | "center" | "end";
+  width?: string;
+}
+
+interface GenericDataTableProps<T> {
+  title: string;
+  icon?: React.ReactNode;
+  columns: Column[];
+  data: T[];
+  renderCellAction: (item: T, columnKey: string) => React.ReactNode;
+
+  search?: {
+    value: string;
+    placeholder?: string;
+    onChange: (value: string) => void;
+  };
+  paginationProps?: {
+    total: number;
+    page: number;
+    onChange?: (page: number) => void;
+    summary?: string;
+  };
+  tableProps?: Partial<TableProps>;
+  isCollapsible?: boolean;
+  defaultOpen?: boolean;
+  headerSummary?: string;
+  actions?: React.ReactNode;
+  topContent?: React.ReactNode;
+  hideHeader?: boolean;
+  isLoading?: boolean;
+  sort?: {
+    field: string;
+    direction: "asc" | "desc";
+  };
+  onSortChange?: (field: string) => void;
+  onClose?: () => void; // Thêm prop onClose
+  showCloseButton?: boolean; // Thêm prop để hiển thị nút đóng
+}
+
+export const GenericDataTable = <T extends { id: string | number }>({
+  title,
+  icon,
+  columns,
+  data,
+  renderCellAction,
+  search,
+  paginationProps,
+  tableProps,
+  isCollapsible = false,
+  defaultOpen = true,
+  headerSummary,
+  actions,
+  topContent,
+  isLoading,
+  sort,
+  onSortChange,
+  onClose,
+  showCloseButton = false,
+}: GenericDataTableProps<T>) => {
+  const [isOpen, setIsOpen] = React.useState(defaultOpen);
+
+  const renderSkeletonRows = () => {
+    return Array.from({ length: 5 }).map((_, rowIndex) => (
+      <TableRow key={`skeleton-${rowIndex}`}>
+        {columns.map((column, colIndex) => (
+          <TableCell key={colIndex}>
+            <Skeleton className="h-4 w-full rounded-lg" />
+          </TableCell>
+        ))}
+      </TableRow>
+    ));
+  };
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  return (
+    <Card
+      className="overflow-hidden bg-content1 transition-all duration-300"
+      shadow="sm"
+    >
+      <CardBody className="p-0">
+        <div
+          className={`border-b border-divider transition-colors ${isCollapsible ? "hover:bg-default-100" : ""}`}
+        >
+          {title && (
+            <div
+              className={`p-6 flex justify-between items-center ${isCollapsible ? "cursor-pointer select-none" : ""}`}
+              role={isCollapsible ? "button" : undefined}
+              onClick={() => isCollapsible && setIsOpen(!isOpen)}
+            >
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="text-primary">{icon}</div>
+                  <h2 className="text-lg font-bold text-foreground">{title}</h2>
+                </div>
+                <div className="flex items-center gap-4">
+                  {headerSummary && (
+                    <div className="hidden md:block px-3 py-1.5 bg-default-100 rounded-full text-xs font-medium text-default-500 whitespace-nowrap">
+                      Tìm thấy {headerSummary} bản ghi
+                    </div>
+                  )}
+                  {actions && <div>{actions}</div>}
+                  {showCloseButton && onClose && (
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClose();
+                      }}
+                      className="text-default-400 hover:text-danger transition-colors"
+                      aria-label="Đóng"
+                    >
+                      <XMarkIcon className="w-5 h-5" />
+                    </Button>
+                  )}
+                  {isCollapsible && (
+                    <div className="text-default-400">
+                      <ChevronDownIcon
+                        className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+            </div>
+          )}
+        </div>
+
+        <div
+          className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? "opacity-100 max-h-[5000px] visible" : "opacity-0 max-h-0 invisible"}`}
+        >
+          {(search || topContent) && (
+            <div className="p-6 pt-2 border-b border-divider flex gap-4 items-center">
+              {search && (
+                <input
+                  type="text"
+                  placeholder={search.placeholder ?? "Tìm kiếm..."}
+                  className="w-72 border rounded-lg px-3 py-2 text-sm"
+                  value={search.value}
+                  onChange={(e) => search.onChange(e.target.value)}
+                />
+              )}
+
+              {topContent}
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <Table
+              removeWrapper
+              aria-label={title}
+              isStriped
+              classNames={{
+                tr: "hover:bg-default-100 transition-colors",
+                th: "bg-default-50 text-default-400 font-bold py-4 px-4 text-[11px] uppercase tracking-widest",
+                td: "py-4 px-4 text-sm text-foreground last:border-none",
+                ...tableProps?.classNames,
+              }}
+              {...tableProps}
+            >
+              <TableHeader>
+                {columns.map((column, index) => (
+                  <TableColumn
+                    key={column.key}
+                    align={column.align || "start"}
+                    onClick={() =>
+                      column.sortable && onSortChange?.(column.key)
+                    }
+                    className={`${index === 0 ? "!pl-8" : ""} bg-default-100 text-foreground ${onSortChange ? "cursor-pointer select-none" : ""} column.sortable ? "cursor-pointer select-none ..." : ""`}
+                    style={column.width ? { width: column.width } : {}}
+                  >
+                    {column.label}
+                    {sort?.field === column.key &&
+                      (sort.direction === "asc" ? (
+                        <SortAscIcon className="w-3 h-3" />
+                      ) : (
+                        <SortDescIcon className="w-3 h-3" />
+                      ))}
+                  </TableColumn>
+                ))}
+              </TableHeader>
+              <TableBody
+                emptyContent={
+                  !isLoading ? "Không có dữ liệu để hiển thị." : null
+                }
+                items={isLoading ? [] : data}
+                className="flex items-center justify-center"
+              >
+                {isLoading
+                  ? renderSkeletonRows()
+                  : (item) => (
+                      <TableRow
+                        key={item.id}
+                        className="hover:bg-default-50 transition-colors hover:bg-default-10 even:bg-default-50 border-divider"
+                      >
+                        {columns.map((column, index) => (
+                          <TableCell
+                            key={column.key}
+                            className={index === 0 ? "!pl-8" : ""}
+                          >
+                            {renderCellAction(item, column.key)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {paginationProps && (
+            <CustomPagination
+              page={paginationProps.page}
+              summary={paginationProps.summary}
+              total={paginationProps.total}
+              onChange={paginationProps.onChange}
+            />
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  );
+};

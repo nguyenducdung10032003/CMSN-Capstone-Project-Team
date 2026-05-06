@@ -1,0 +1,483 @@
+package com.capstone.auth.application.business.users;
+
+import com.capstone.auth.application.dto.request.users.FilterUsersRequest;
+import com.capstone.auth.application.dto.response.EmployeeResponse;
+import com.capstone.common.enumerate.RoleName;
+import com.capstone.common.exception.NotExistingException;
+import com.capstone.auth.domain.model.EmployeeJob;
+import com.capstone.auth.domain.model.Profile;
+import com.capstone.auth.domain.model.Roles;
+import com.capstone.auth.domain.model.Users;
+import com.capstone.auth.infrastructure.persistence.*;
+import com.capstone.auth.application.business.profile.ProfileService;
+import com.capstone.auth.infrastructure.service.NetworkService;
+import com.capstone.auth.infrastructure.service.OrganizationService;
+import com.capstone.auth.application.business.pages.BusinessPageService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.Logger;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceImplTest {
+
+  @Mock
+  private UserRepository repo;
+
+  @Mock
+  private BusinessPagesOfEmployeeRepository bpRepo;
+
+  @Mock
+  private ProfileRepository profileRepo;
+
+  @Mock
+  private EmployeeJobRepository employeeJobRepo;
+
+  @Mock
+  private NetworkService netWorkService;
+
+  @Mock
+  private OrganizationService organizationService;
+
+  @Mock
+  private IndividualNotificationRepository indRepo;
+
+  @Mock
+  private RoleRepository roleRepo;
+
+  @Mock
+  private ProfileService pSrv;
+
+  @Mock
+  private Logger log;
+
+  @InjectMocks
+  private UserServiceImpl userService;
+
+  @Mock
+  private BusinessPageService bpService;
+
+  @BeforeEach
+  void setUp() {
+    ReflectionTestUtils.setField(userService, "log", log);
+  }
+
+  @Test
+  @DisplayName("should_CreateEmployee_When_InputIsValid")
+  void should_CreateEmployee_When_InputIsValid() {
+    // Arrange
+    var username = "testuser";
+    var email = "test@example.com";
+    var role = new Roles();
+    role.setName(RoleName.IT_STAFF);
+    List<String> jobIds = List.of("job1");
+    var departmentId = "dept1";
+    var waterSupplyNetworkId = "wsn1";
+    var fullName = "Full Name";
+    var phone = "0123456789";
+
+    when(repo.findByEmail(email)).thenReturn(Optional.empty());
+    when(profileRepo.existsByPhoneNumber(phone)).thenReturn(false);
+    when(netWorkService.checkExistence(waterSupplyNetworkId)).thenReturn(true);
+    when(organizationService.checkDepartmentExistence(departmentId)).thenReturn(true);
+    when(organizationService.checkJobExistence("job1")).thenReturn(true);
+
+    var mockUser = new Users();
+    mockUser.setUserId("user-id");
+    when(repo.save(any(Users.class))).thenReturn(mockUser);
+    when(profileRepo.save(any(Profile.class))).thenReturn(new Profile());
+    when(employeeJobRepo.save(any(EmployeeJob.class))).thenReturn(new EmployeeJob());
+
+    // Act
+    userService.createEmployee("user-id", username, email, role, jobIds, departmentId, waterSupplyNetworkId, fullName, phone);
+
+    // Assert
+    verify(repo).save(argThat(u -> u.getEmail().equals(email) &&
+        u.getUsername().equals(username) &&
+        u.getRole().equals(role) &&
+        u.getDepartmentId().equals(departmentId) &&
+        u.getWaterSupplyNetworkId().equals(waterSupplyNetworkId)));
+    verify(profileRepo).save(any(Profile.class));
+    verify(employeeJobRepo).save(any(EmployeeJob.class));
+  }
+
+  @Test
+  @DisplayName("should_NotThrow_When_EmailExists_CurrentBehavior")
+  void should_NotThrow_When_EmailExists_CurrentBehavior() {
+    var email = "test@example.com";
+    when(repo.findByEmail(email)).thenReturn(Optional.of(new Users()));
+
+    assertDoesNotThrow(
+        () -> userService.createEmployee("id","u", email, new Roles(), List.of(), "dept1", "wsn1", "name", "0123456789"));
+  }
+
+  @Test
+  @DisplayName("should_NotThrow_When_PhoneExists_CurrentBehavior")
+  void should_NotThrow_When_PhoneExists_CurrentBehavior() {
+    var phone = "0123456789";
+    when(repo.findByEmail(anyString())).thenReturn(Optional.empty());
+    when(profileRepo.existsByPhoneNumber(phone)).thenReturn(true);
+
+    assertDoesNotThrow(
+        () -> userService.createEmployee("id","u", "test@example.com", new Roles(), List.of(), "dept1", "wsn1", "name", phone));
+  }
+
+  @Test
+  @DisplayName("should_NotThrow_When_NetworkIdNotExists_CurrentBehavior")
+  void should_NotThrow_When_NetworkIdNotExists_CurrentBehavior() {
+    var networkId = "wsn1";
+    when(repo.findByEmail(anyString())).thenReturn(Optional.empty());
+    when(profileRepo.existsByPhoneNumber(anyString())).thenReturn(false);
+    when(netWorkService.checkExistence(networkId)).thenReturn(false);
+
+    assertDoesNotThrow(
+        () -> userService.createEmployee("id", "u", "test@example.com", new Roles(), List.of(), "dept1", networkId, "name", "0123456789"));
+  }
+
+  @Test
+  @DisplayName("should_ThrowNotExistingException_When_DepartmentIdNotExists")
+  void should_ThrowNotExistingException_When_DepartmentIdNotExists() {
+    var deptId = "dept1";
+    when(repo.findByEmail(anyString())).thenReturn(Optional.empty());
+    when(profileRepo.existsByPhoneNumber(anyString())).thenReturn(false);
+    when(netWorkService.checkExistence(anyString())).thenReturn(true);
+    when(organizationService.checkDepartmentExistence(deptId)).thenReturn(false);
+
+    assertThrows(NotExistingException.class,
+        () -> userService.createEmployee("id", "u", "test@example.com", new Roles(), List.of(), deptId, "wsn1", "name", "0123456789"));
+  }
+
+  @Test
+  @DisplayName("should_ThrowNotExistingException_When_JobIdNotExists")
+  void should_ThrowNotExistingException_When_JobIdNotExists() {
+    List<String> jobs = List.of("job1");
+    when(repo.findByEmail(anyString())).thenReturn(Optional.empty());
+    when(profileRepo.existsByPhoneNumber(anyString())).thenReturn(false);
+    when(netWorkService.checkExistence(anyString())).thenReturn(true);
+    when(organizationService.checkDepartmentExistence(anyString())).thenReturn(true);
+    when(organizationService.checkJobExistence("job1")).thenReturn(false);
+
+    assertThrows(NotExistingException.class,
+        () -> userService.createEmployee("id", "u", "test@example.com", new Roles(), jobs, "dept1", "wsn1", "name", "0123456789"));
+  }
+
+  @Test
+  @DisplayName("should_CheckExistence_When_ValueIsEmail")
+  void should_CheckExistence_When_ValueIsEmail() {
+    var email = "test@example.com";
+    when(repo.existsByEmail(email)).thenReturn(true);
+
+    assertTrue(userService.checkExistence(email));
+    verify(repo).existsByEmail(email);
+    verify(repo, never()).existsByUsername(anyString());
+  }
+
+  @Test
+  @DisplayName("should_CheckExistence_When_ValueIsUsername")
+  void should_CheckExistence_When_ValueIsUsername() {
+    var username = "testuser";
+    when(repo.existsByUsername(username)).thenReturn(true);
+
+    assertTrue(userService.checkExistence(username));
+    verify(repo).existsByUsername(username);
+    verify(repo, never()).existsByEmail(anyString());
+  }
+
+  @Test
+  @DisplayName("should_ThrowNullPointerException_When_CheckExistenceInputIsNull")
+  void should_ThrowNullPointerException_When_CheckExistenceInputIsNull() {
+    assertThrows(NullPointerException.class, () -> userService.checkExistence(null));
+  }
+
+  @Test
+  @DisplayName("should_GetUserById_When_UserExists")
+  void should_GetUserById_When_UserExists() {
+    var userId = "user-id";
+    var user = new Users();
+    user.setUserId(userId);
+    user.setUsername("u");
+    user.setEmail("test@example.com");
+    user.setDepartmentId("department-id");
+    user.setWaterSupplyNetworkId("network-id");
+    user.setIsEnabled(true);
+    user.setIsLocked(false);
+
+    var role = new Roles();
+    role.setName(RoleName.IT_STAFF);
+    user.setRole(role);
+
+    when(repo.findById(userId)).thenReturn(Optional.of(user));
+    when(bpRepo.findPagesOfEmployeesByUsersUserId(userId)).thenReturn(Collections.emptyList());
+
+    var result = userService.getUserById(userId);
+
+    assertNotNull(result);
+    assertEquals(userId, result.userId());
+  }
+
+  @Test
+  @DisplayName("should_ThrowNotExistingException_When_GetUserByIdNotFound")
+  void should_ThrowNotExistingException_When_GetUserByIdNotFound() {
+    var userId = "user-id";
+    when(repo.findById(userId)).thenReturn(Optional.empty());
+
+    assertThrows(NotExistingException.class, () -> userService.getUserById(userId));
+  }
+
+  @Test
+  @DisplayName("should_UpdateUsername_When_UserExists")
+  void should_UpdateUsername_When_UserExists() {
+    var userId = "user-id";
+    var newUsername = "new-user";
+    var user = new Users();
+    user.setUserId(userId);
+    user.setUsername("old-user");
+    user.setEmail("test@example.com");
+    user.setDepartmentId("department-id");
+    user.setWaterSupplyNetworkId("network-id");
+    user.setIsEnabled(true);
+    user.setIsLocked(false);
+
+    var role = new Roles();
+    role.setName(RoleName.IT_STAFF);
+    user.setRole(role);
+
+    when(repo.findById(userId)).thenReturn(Optional.of(user));
+    when(bpRepo.findPagesOfEmployeesByUsersUserId(userId)).thenReturn(Collections.emptyList());
+
+    var result = userService.updateUsername(userId, newUsername);
+
+    assertEquals(newUsername, result.username());
+    verify(repo).save(user);
+  }
+
+  @Test
+  @DisplayName("should_ThrowIllegalArgumentException_When_UpdateUsernameUserNotFound")
+  void should_ThrowIllegalArgumentException_When_UpdateUsernameUserNotFound() {
+    var userId = "user-id";
+    when(repo.findById(userId)).thenReturn(Optional.empty());
+
+    assertThrows(NotExistingException.class, () -> userService.updateUsername(userId, "new"));
+  }
+
+  @Test
+  @DisplayName("should_GetAllEmployeesWithStatus_When_RequestHasNoStatus")
+  void should_GetAllEmployeesWithStatus_When_RequestHasNoStatus() {
+    var pageable = Pageable.unpaged();
+    var request = new FilterUsersRequest(null, null);
+
+    var user = new Users();
+    user.setUserId("uid");
+    user.setUsername("user");
+    user.setEmail("test@example.com");
+    user.setDepartmentId("dept1");
+    user.setWaterSupplyNetworkId("wsn1");
+
+    Page<Users> page = new PageImpl<>(List.of(user));
+    when(repo.findAll(pageable)).thenReturn(page);
+    // when(profileRepo.findById("uid")).thenReturn(Optional.of(new Profile("pid", user, "Full Name", null, null, null, null, null)));
+    
+    // mapToEmployeeResponse mocks
+    when(pSrv.getFullName("uid")).thenReturn("Full Name");
+    when(organizationService.getDepartmentName("dept1")).thenReturn("Dept 1");
+    when(netWorkService.getNameById("wsn1")).thenReturn("Net 1");
+    when(bpService.getPagesByEmployeeId("uid")).thenReturn(Collections.emptyList());
+
+    Page<EmployeeResponse> result = userService.getAllEmployeesWithStatus(pageable, request);
+
+    assertEquals(1, result.getTotalElements());
+    assertEquals("user", result.getContent().getFirst().username());
+  }
+
+  @Test
+  @DisplayName("should_GetAllEmployeesWithStatus_When_RequestHasStatus")
+  void should_GetAllEmployeesWithStatus_When_RequestHasStatus() {
+    var pageable = Pageable.unpaged();
+    var request = new FilterUsersRequest(true, null);
+
+    when(repo.findByIsEnabledTrueAndIsLockedFalse(pageable)).thenReturn(new PageImpl<>(Collections.emptyList()));
+
+    Page<EmployeeResponse> result = userService.getAllEmployeesWithStatus(pageable, request);
+
+    assertEquals(0, result.getTotalElements());
+    verify(repo).findByIsEnabledTrueAndIsLockedFalse(pageable);
+  }
+
+  @Test
+  @DisplayName("should_CheckExistence_NotThrow_When_EmailInput")
+  void should_CheckExistence_NotThrow_When_EmailInput() {
+    var email = "email@test.com";
+
+    assertDoesNotThrow(() -> userService.checkExistence(email));
+  }
+
+  @Test
+  @DisplayName("should_ReturnTrue_When_UserExists")
+  void should_IsUserExists_Success() {
+    var userId = "user-id";
+    when(repo.existsById(userId)).thenReturn(true);
+
+    assertTrue(userService.isUserExists(userId));
+    verify(repo).existsById(userId);
+  }
+
+  @Test
+  @DisplayName("should_GetUserByEmail_When_Exists")
+  void should_GetUserByEmail_Success() {
+    var email = "test@example.com";
+    var user = new Users();
+    user.setUserId("uid");
+    user.setEmail(email);
+    user.setDepartmentId("dept1");
+    user.setWaterSupplyNetworkId("wsn1");
+    user.setIsEnabled(true);
+    user.setIsLocked(false);
+    user.setRole(new Roles());
+    user.getRole().setName(RoleName.IT_STAFF);
+
+    when(repo.findByEmail(email)).thenReturn(Optional.of(user));
+    when(bpRepo.findPagesOfEmployeesByUsersUserId("uid")).thenReturn(Collections.emptyList());
+
+    var result = userService.getUserByEmail(email);
+
+    assertNotNull(result);
+    assertEquals(email, result.email());
+  }
+
+  @Test
+  @DisplayName("should_ThrowNotExistingException_When_UserEmailNotFound")
+  void should_GetUserByEmail_NotFound() {
+    var email = "missing@example.com";
+    when(repo.findByEmail(email)).thenReturn(Optional.empty());
+
+    assertThrows(NotExistingException.class, () -> userService.getUserByEmail(email));
+  }
+
+  @Test
+  @DisplayName("should_GetUserByEmail_When_UserExists_VerifyRepoCall")
+  void should_GetUserByEmail_When_UserExists_VerifyRepoCall() {
+    var email = "test@example.com";
+    var user = new Users();
+    user.setUserId("uid");
+    user.setRole(new Roles());
+    user.getRole().setName(RoleName.IT_STAFF);
+    when(repo.findByEmail(email)).thenReturn(Optional.of(user));
+
+    userService.getUserByEmail(email);
+
+    verify(repo).findByEmail(email);
+  }
+
+  @Test
+  @DisplayName("should_GetAllEmployeesWithStatus_When_RequestIsNull")
+  void should_GetAllEmployeesWithStatus_RequestNull() {
+    var pageable = Pageable.unpaged();
+    when(repo.findAll(pageable)).thenReturn(new PageImpl<>(Collections.emptyList()));
+
+    var result = userService.getAllEmployeesWithStatus(pageable, null);
+
+    assertNotNull(result);
+    verify(repo).findAll(pageable);
+  }
+
+  @Test
+  @DisplayName("should_GetAllEmployeesWithStatus_When_UsernameOnly")
+  void should_GetAllEmployeesWithStatus_UsernameOnly() {
+    var pageable = Pageable.unpaged();
+    var request = new FilterUsersRequest(null, "user1");
+    when(repo.findByUsernameContainsIgnoreCase("user1", pageable)).thenReturn(new PageImpl<>(Collections.emptyList()));
+
+    var result = userService.getAllEmployeesWithStatus(pageable, request);
+
+    assertNotNull(result);
+    verify(repo).findByUsernameContainsIgnoreCase("user1", pageable);
+  }
+
+  @Test
+  @DisplayName("should_GetAllEmployeesWithStatus_When_UsernameAndStatus")
+  void should_GetAllEmployeesWithStatus_UsernameAndStatus() {
+    var pageable = Pageable.unpaged();
+    var request = new FilterUsersRequest(true, "user1");
+    when(repo.findByIsEnabledTrueAndIsLockedFalseOrUsernameContainingIgnoreCase("user1", pageable))
+        .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+    var result = userService.getAllEmployeesWithStatus(pageable, request);
+
+    assertNotNull(result);
+    verify(repo).findByIsEnabledTrueAndIsLockedFalseOrUsernameContainingIgnoreCase("user1", pageable);
+  }
+
+  @Test
+  @DisplayName("should_DeleteEmployee_Success")
+  void should_DeleteEmployee_Success() {
+    var id = "user-id";
+    var user = new Users();
+    user.setUserId(id);
+    user.setIsEnabled(true);
+    user.setUsername("u");
+    user.setDepartmentId("d");
+    user.setWaterSupplyNetworkId("n");
+
+    when(repo.findById(id)).thenReturn(Optional.of(user));
+    when(roleRepo.findByUsers(anySet())).thenReturn(Collections.emptyList());
+    when(pSrv.getFullName(id)).thenReturn("Full Name");
+    when(organizationService.getDepartmentName(any())).thenReturn("Dept");
+    when(netWorkService.getNameById(any())).thenReturn("Net");
+    when(bpService.getPagesByEmployeeId(id)).thenReturn(Collections.emptyList());
+
+    var result = userService.deleteEmployee(id);
+
+    assertFalse(user.getIsEnabled());
+    verify(indRepo).deleteByUserId(id);
+    verify(bpRepo).deleteByUsers(user);
+    verify(repo).save(user);
+    assertNotNull(result);
+  }
+
+  @Test
+  @DisplayName("should_ThrowIllegalArgumentException_When_DeleteAlreadyDisabledEmployee")
+  void should_DeleteEmployee_Fails_WhenDisabled() {
+    var id = "user-id";
+    var user = new Users();
+    user.setUserId(id);
+    user.setIsEnabled(false);
+
+    when(repo.findById(id)).thenReturn(Optional.of(user));
+
+    assertThrows(IllegalArgumentException.class, () -> userService.deleteEmployee(id));
+  }
+
+  @Test
+  @DisplayName("should_GetRoleOfEmployee_Success")
+  void should_GetRoleOfEmployee_Success() {
+    var id = "user-id";
+    var user = new Users();
+    user.setUserId(id);
+    var role = new Roles();
+    role.setName(RoleName.IT_STAFF);
+
+    when(repo.findById(id)).thenReturn(Optional.of(user));
+    when(roleRepo.findByUsers(anySet())).thenReturn(List.of(role));
+
+    var result = userService.getRoleOfEmployee(id);
+
+    assertEquals("IT_STAFF", result);
+  }
+}

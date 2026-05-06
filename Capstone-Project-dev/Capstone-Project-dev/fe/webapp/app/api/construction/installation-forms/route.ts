@@ -1,0 +1,78 @@
+import {
+  createNewInstallationForm,
+  getInstallationForms,
+} from "@/services/construction.service";
+import { getAccessToken } from "@/utils/getAccessToken";
+import { NextRequest } from "next/dist/server/web/spec-extension/request";
+import { NextResponse } from "next/server";
+
+export async function GET(req: NextRequest) {
+  try {
+    const accessToken = getAccessToken(req);
+
+    if (!accessToken) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const page = Number(searchParams.get("page") ?? 0);
+    const size = Number(searchParams.get("size") ?? 10);
+    const keyword = searchParams.get("keyword") || undefined;
+    const from = searchParams.get("from") || undefined;
+    const to = searchParams.get("to") || undefined;
+    const status = searchParams.get("status") || undefined;
+
+    const response = await getInstallationForms(
+      accessToken,
+      page,
+      size,
+      keyword,
+      from,
+      to,
+      status, // Truyền status vào service
+    );
+
+    return NextResponse.json(
+      {
+        message: "Lấy danh sách đơn thành công",
+        data: response.data.data,
+      },
+      { status: 200 },
+    );
+  } catch (error: any) {
+    const status = error?.response?.status ?? 500;
+
+    return NextResponse.json(
+      {
+        message: error?.response?.data?.message ?? "Internal Server Error",
+        error: error?.response?.data ?? null,
+      },
+      { status },
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const accessToken = getAccessToken(req);
+
+    if (!accessToken) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    const payload = await req.json();
+
+    const response = await createNewInstallationForm(accessToken, payload);
+
+    return NextResponse.json(response.data, { status: 201 });
+  } catch (error: any) {
+    const backendError = error?.response?.data;
+    return NextResponse.json(
+      {
+        message: backendError?.message || "Tạo đơn thất bại",
+        data: backendError?.data ?? null,
+        error: backendError ?? null,
+      },
+      { status: error?.response?.status || 500 },
+    );
+  }
+}

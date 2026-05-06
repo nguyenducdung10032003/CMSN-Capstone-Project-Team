@@ -1,0 +1,148 @@
+package com.capstone.auth.domain.model;
+
+import com.capstone.auth.infrastructure.utils.Message;
+import com.capstone.common.utils.SharedConstant;
+import com.capstone.common.utils.SharedMessage;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.NonNull;
+
+import java.time.LocalDate;
+import java.util.Objects;
+import java.util.function.Consumer;
+
+@Table
+@Getter
+@Entity
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class Profile {
+  @Id
+  String profileId;
+
+  @OneToOne(fetch = FetchType.EAGER)
+  @MapsId
+  @JoinColumn(name = "user_id")
+  Users users;
+
+  @Transient
+  String fullname;
+  String avatarUrl;
+  String address;
+
+  @Column(unique = true, nullable = false)
+  String phoneNumber;
+  Boolean gender;
+
+  @JsonFormat(pattern = "yyyy-MM-dd")
+  LocalDate birthday;
+
+  public void setUsers(Users users) {
+    Objects.requireNonNull(users, Message.PT_02);
+    this.users = users;
+  }
+
+  public void setProfileId(String value) {
+    Objects.requireNonNull(value, SharedMessage.MES_07);
+    this.profileId = value;
+  }
+
+  public void setFullname(String fullname) {
+    requireNonNullAndNotEmpty(fullname, SharedMessage.MES_19);
+    if (!fullname.chars().allMatch(c -> Character.isLetter(c) || Character.isWhitespace(c))) {
+      throw new IllegalArgumentException(Message.PT_07);
+    }
+    this.fullname = fullname;
+  }
+
+  public void setAvatarUrl(String avatarUrl) {
+    requireNonNullAndNotEmpty(avatarUrl, Message.PT_06);
+    this.avatarUrl = avatarUrl;
+  }
+
+  public void setAddress(String address) {
+    requireNonNullAndNotEmpty(address, SharedMessage.MES_06);
+    this.address = address;
+  }
+
+  private void requireNonNullAndNotEmpty(String value, String message) {
+    Objects.requireNonNull(value, message);
+    if (value.trim().isEmpty()) {
+      throw new IllegalArgumentException(message);
+    }
+  }
+
+  public void setPhoneNumber(String phoneNumber) {
+    Objects.requireNonNull(phoneNumber, SharedMessage.MES_04);
+    if (phoneNumber.isBlank()) {
+      throw new IllegalArgumentException(SharedMessage.MES_03);
+    }
+    if (!phoneNumber.matches(SharedConstant.PHONE_PATTERN)) {
+      throw new IllegalArgumentException(SharedMessage.MES_04);
+    }
+    this.phoneNumber = phoneNumber;
+  }
+
+  public void setGender(Boolean gender) {
+    Objects.requireNonNull(gender, Message.PT_08);
+    this.gender = gender;
+  }
+
+  public void setBirthday(LocalDate birthday) {
+    Objects.requireNonNull(birthday, Message.PT_09);
+    this.birthday = birthday;
+  }
+
+  public static Profile create(@NonNull Consumer<ProfileBuilder> consumer) {
+    var builder = new ProfileBuilder();
+    consumer.accept(builder);
+    return builder.build();
+  }
+
+  public static class ProfileBuilder {
+    private final Profile unit = new Profile();
+
+    public ProfileBuilder address(String value) {
+      unit.setAddress(value);
+      return this;
+    }
+
+    public ProfileBuilder avatarUrl(String value) {
+      unit.setAvatarUrl(value);
+      return this;
+    }
+
+    public ProfileBuilder fullname(String value) {
+      unit.setFullname(value);
+      return this;
+    }
+
+    public ProfileBuilder phoneNumber(String value) {
+      unit.setPhoneNumber(value);
+      return this;
+    }
+
+    public ProfileBuilder gender(Boolean value) {
+      unit.setGender(value);
+      return this;
+    }
+
+    public ProfileBuilder birthday(LocalDate value) {
+      unit.setBirthday(value);
+      return this;
+    }
+
+    public ProfileBuilder users(Users value) {
+      unit.setUsers(value);
+      return this;
+    }
+
+    public Profile build() {
+      return unit;
+    }
+  }
+}

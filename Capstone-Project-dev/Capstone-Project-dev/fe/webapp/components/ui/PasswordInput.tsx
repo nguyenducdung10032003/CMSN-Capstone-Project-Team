@@ -1,0 +1,65 @@
+"use client";
+
+import React, { useState } from "react";
+import { Input, InputProps } from "@heroui/react";
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
+import { focusNextFieldOnEnter } from "@/utils/focusNextFieldOnEnter";
+
+interface PasswordInputProps extends InputProps {
+  placeholder?: string;
+  label?: string;
+}
+
+const PasswordInput = ({
+  placeholder,
+  label,
+  onKeyDown,
+  errorMessage,
+  ...props
+}: PasswordInputProps) => {
+  const [showPassword, setShowPassword] = useState(false);
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  return (
+    <Input
+      {...props}
+      errorMessage={errorMessage || undefined}
+      endContent={
+        <div className="flex items-center h-full">
+          <button
+            aria-label="toggle password visibility"
+            className="cursor-pointer focus:outline-solid outline-transparent"
+            type="button"
+            onClick={togglePasswordVisibility}
+          >
+            {showPassword ? (
+              <EyeSlashIcon className="w-5 h-5 text-default-400" />
+            ) : (
+              <EyeIcon className="w-5 h-5 text-default-400" />
+            )}
+          </button>
+        </div>
+      }
+      label={label}
+      labelPlacement="inside"
+      placeholder={placeholder}
+      size="md"
+      type={showPassword ? "text" : "password"}
+      onKeyDown={(e) => {
+        onKeyDown?.(e);
+        if (!e.defaultPrevented) {
+          focusNextFieldOnEnter(
+            e as React.KeyboardEvent<
+              HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+            >,
+          );
+        }
+      }}
+    />
+  );
+};
+
+export default PasswordInput;

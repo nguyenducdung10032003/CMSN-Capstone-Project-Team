@@ -1,0 +1,188 @@
+package com.capstone.device.domain.model;
+
+import com.capstone.common.utils.SharedMessage;
+import com.capstone.device.infrastructure.util.Message;
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.NonNull;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Objects;
+import java.util.function.Consumer;
+
+@Table
+@Getter
+@Entity
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+// đơn giá vật tư
+public class Material {
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  String materialId;
+
+  @Column(nullable = false, columnDefinition = "TEXT")
+  String laborCode; // ma hieu nhan cong
+
+  @Column(nullable = false, columnDefinition = "TEXT")
+  String jobContent;
+
+  @Column(nullable = false, precision = 19, scale = 2)
+  BigDecimal price;
+
+  @Column(nullable = false, precision = 19, scale = 2)
+  BigDecimal laborPrice;
+
+  @Column(nullable = false, precision = 19, scale = 2)
+  BigDecimal laborPriceAtRuralCommune;
+
+  @Column(nullable = false, precision = 19, scale = 2)
+  BigDecimal constructionMachineryPrice;
+
+  @Column(nullable = false, precision = 19, scale = 2)
+  BigDecimal constructionMachineryPriceAtRuralCommune;
+
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "materials_group_id", nullable = false)
+  MaterialsGroup group;
+
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "calculation_unit_id", nullable = false)
+  Unit unit;
+
+  @Column(nullable = false)
+  LocalDateTime createdAt;
+
+  @Column(nullable = false)
+  LocalDateTime updatedAt;
+
+  @PrePersist
+  void onCreate() {
+    this.createdAt = LocalDateTime.now();
+    this.updatedAt = this.createdAt;
+  }
+
+  @PreUpdate
+  void onUpdate() {
+    this.updatedAt = LocalDateTime.now();
+  }
+
+  public void setJobContent(String jobContent) {
+    Objects.requireNonNull(jobContent, SharedMessage.MES_14);
+    if (jobContent.trim().isEmpty()) {
+      throw new IllegalArgumentException(SharedMessage.MES_14);
+    }
+    this.jobContent = jobContent;
+  }
+
+  public void setLaborCode(String value) {
+    Objects.requireNonNull(value, Message.ENT_47);
+    if (value.trim().isEmpty()) {
+      throw new IllegalArgumentException(Message.ENT_47);
+    }
+    this.laborCode = value;
+  }
+
+  public void setPrice(BigDecimal price) {
+    requireNonNullAndNotEmpty(price, Message.ENT_04);
+    this.price = price;
+  }
+
+  public void setLaborPrice(BigDecimal laborPrice) {
+    requireNonNullAndNotEmpty(laborPrice, Message.ENT_06);
+    this.laborPrice = laborPrice;
+  }
+
+  public void setLaborPriceAtRuralCommune(BigDecimal laborPriceAtRuralCommune) {
+    requireNonNullAndNotEmpty(laborPriceAtRuralCommune, Message.ENT_08);
+    this.laborPriceAtRuralCommune = laborPriceAtRuralCommune;
+  }
+
+  public void setConstructionMachineryPrice(BigDecimal constructionMachineryPrice) {
+    requireNonNullAndNotEmpty(constructionMachineryPrice, Message.ENT_10);
+    this.constructionMachineryPrice = constructionMachineryPrice;
+  }
+
+  public void setConstructionMachineryPriceAtRuralCommune(BigDecimal constructionMachineryPriceAtRuralCommune) {
+    requireNonNullAndNotEmpty(constructionMachineryPriceAtRuralCommune, Message.ENT_21);
+    this.constructionMachineryPriceAtRuralCommune = constructionMachineryPriceAtRuralCommune;
+  }
+
+  private void requireNonNullAndNotEmpty(BigDecimal value, String message) {
+    Objects.requireNonNull(value, message);
+    if (value.compareTo(BigDecimal.ZERO) < 0) {
+      throw new IllegalArgumentException(message);
+    }
+  }
+
+  public void setGroup(MaterialsGroup group) {
+    this.group = Objects.requireNonNull(group, Message.ENT_35);
+  }
+
+  public void setUnit(Unit unit) {
+    this.unit = Objects.requireNonNull(unit, Message.ENT_36);
+  }
+
+  public static Material create(@NonNull Consumer<SupplyBuilder> consumer) {
+    var builder = new SupplyBuilder();
+    consumer.accept(builder);
+    return builder.build();
+  }
+
+  public static class SupplyBuilder {
+    private final Material material = new Material();
+
+    public SupplyBuilder laborCode(String value) {
+      material.setLaborCode(value);
+      return this;
+    }
+
+    public SupplyBuilder jobContent(String jobContent) {
+      material.setJobContent(jobContent);
+      return this;
+    }
+
+    public SupplyBuilder price(BigDecimal price) {
+      material.setPrice(price);
+      return this;
+    }
+
+    public SupplyBuilder laborPrice(BigDecimal laborPrice) {
+      material.setLaborPrice(laborPrice);
+      return this;
+    }
+
+    public SupplyBuilder laborPriceAtRuralCommune(BigDecimal laborPriceAtRuralCommune) {
+      material.setLaborPriceAtRuralCommune(laborPriceAtRuralCommune);
+      return this;
+    }
+
+    public SupplyBuilder constructionMachineryPrice(BigDecimal constructionMachineryPrice) {
+      material.setConstructionMachineryPrice(constructionMachineryPrice);
+      return this;
+    }
+
+    public SupplyBuilder constructionMachineryPriceAtRuralCommune(BigDecimal constructionMachineryPriceAtRuralCommune) {
+      material.setConstructionMachineryPriceAtRuralCommune(constructionMachineryPriceAtRuralCommune);
+      return this;
+    }
+
+    public SupplyBuilder group(MaterialsGroup group) {
+      material.setGroup(group);
+      return this;
+    }
+
+    public SupplyBuilder unit(Unit unit) {
+      material.setUnit(unit);
+      return this;
+    }
+
+    public Material build() {
+      return material;
+    }
+  }
+}

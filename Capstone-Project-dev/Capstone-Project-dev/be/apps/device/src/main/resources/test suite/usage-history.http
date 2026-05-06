@@ -1,0 +1,168 @@
+@uri = http://localhost:9006/api/v1/usage
+@customerId = 00a6ec02-3652-46fd-8c62-c5d01c7b3148
+@serial = 00000000-0000-0000-0000-A00000000001
+@reviewId = rev-123
+
+# ============================================================================
+# 1. QUẢN LÝ LỊCH SỬ SỬ DỤNG (GET APIS)
+# ============================================================================
+
+### TC01 - Lấy lịch sử sử dụng nước theo customer ID
+GET {{uri}}/customer/{{customerId}}
+Authorization: Bearer {{access_token}}
+
+### TC02 - Lấy lịch sử theo danh sách customer IDs (batch)
+GET {{uri}}/batch?ids={{customerId}}&ids=CUST-2024-002
+Authorization: Bearer {{access_token}}
+
+### TC03 - Lấy báo cáo tiêu thụ nước (consumption report)
+GET {{uri}}/consumption-report?ids={{customerId}}
+Authorization: Bearer {{access_token}}
+
+### TC04 - Lấy dữ liệu tiêu thụ gần nhất (3 tháng)
+GET {{uri}}/recent/{{customerId}}
+Authorization: Bearer {{access_token}}
+
+### TC05 - Lấy hình ảnh đồng hồ mới nhất
+GET {{uri}}/latest-image/{{customerId}}
+Authorization: Bearer {{access_token}}
+
+# ============================================================================
+# 2. GHI NHẬN VÀ PHÂN TÍCH CHỈ SỐ (POST APIS)
+# ============================================================================
+
+### TC06 - Cập nhật chỉ số nước tháng này (Có Serial)
+POST {{uri}}/{{serial}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "index": 155.5,
+  "recordingDate": "2024-03-01"
+}
+
+### TC07 - Phân tích ảnh chụp đồng hồ với AI (Yêu cầu có Serial)
+POST {{uri}}/analyze/2178583
+Authorization: Bearer {{access_token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="image"; filename="img_1.png"
+Content-Type: image/png
+
+< ./img_1.png
+--WebAppBoundary
+Content-Disposition: form-data; name="recordingDate"
+
+2024-04-04
+--WebAppBoundary--
+
+### TC08 - Phân tích ảnh chụp đồng hồ với AI (Không cần Serial)
+POST {{uri}}/analyze
+Authorization: Bearer {{access_token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="image"; filename="img_1.png"
+Content-Type: image/png
+
+< ./img_1.png
+--WebAppBoundary
+Content-Disposition: form-data; name="recordingDate"
+
+2024-04-04
+--WebAppBoundary--
+
+# ============================================================================
+# 3. PHÊ DUYỆT VÀ ĐIỀU CHỈNH (WORKFLOW APIS)
+# ============================================================================
+
+### TC09 - Lấy danh sách các bản ghi chờ phê duyệt (AI reviews)
+GET {{uri}}/pending-reviews?roadmapId=5e6f7081-4000-4eee-9fff-eeee4eee0001
+Authorization: Bearer {{access_token}}
+
+### TC10 - Xác nhận chỉ số sau khi AI phân tích
+POST {{uri}}/confirm/{{reviewId}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/x-www-form-urlencoded
+
+finalIndex=155.0&status=APPROVED
+
+### TC11 - Cập nhật (Sửa) chỉ số tiêu thụ nước thủ công
+PUT {{uri}}/{{serial}}?date=2024-03-01&index=150.5
+Authorization: Bearer {{access_token}}
+
+### TC12 - Cập nhật trạng thái thanh toán
+PATCH {{uri}}/{{serial}}?method=BANK_TRANSFER
+Authorization: Bearer {{access_token}}
+
+# ============================================================================
+# 4. KIỂM THỬ LỖI (NEGATIVE TESTS)
+# ============================================================================
+
+### TC13 - Lấy lịch sử thất bại - ID không tồn tại
+GET {{uri}}/customer/INVALID-ID
+Authorization: Bearer {{access_token}}
+
+> {%
+client.test("Status is 404", function() {
+  client.assert(response.status === 404);
+});
+%}
+
+### TC14 - Cập nhật thất bại - Thiếu tham số bắt buộc (index)
+POST {{uri}}/{{serial}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "recordingDate": "2024-03-01"
+}
+
+> {%
+client.test("Status is 400", function() {
+  client.assert(response.status === 400);
+});
+%}
+
+### TC15 - Cập nhật thất bại - Serial không tồn tại
+POST {{uri}}/NOT-FOUND-SERIAL
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "index": 150.5,
+  "recordingDate": "2024-03-01"
+}
+
+> {%
+client.test("Status is 404", function() {
+  client.assert(response.status === 404);
+});
+%}
+
+### TC16 - Bảo mật - Thiếu Token xác thực
+GET {{uri}}/customer/{{customerId}}
+
+> {%
+client.test("Status is 401", function() {
+  client.assert(response.status === 401);
+});
+%}
+
+### TC17 - SQL Injection attempt in serial
+POST {{uri}}/analyze/' OR 1=1 --
+Authorization: Bearer {{access_token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="recordingDate"
+
+2024-04-04
+--WebAppBoundary--
+
+> {%
+client.test("Status is 4xx", function() {
+  client.assert(response.status >= 400);
+});
+%}

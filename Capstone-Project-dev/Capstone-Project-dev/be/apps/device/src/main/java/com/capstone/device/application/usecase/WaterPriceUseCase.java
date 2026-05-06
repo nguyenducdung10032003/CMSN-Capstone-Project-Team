@@ -1,0 +1,94 @@
+package com.capstone.device.application.usecase;
+
+import com.capstone.device.application.business.waterprice.WaterPriceService;
+import com.capstone.device.application.dto.request.price.CreateRequest;
+import com.capstone.device.application.dto.request.price.UpdateRequest;
+import com.capstone.device.application.dto.response.water.WaterPriceResponse;
+import com.capstone.device.application.event.producer.MessageProducer;
+import com.capstone.device.application.event.producer.waterprices.WaterPriceEvent;
+import com.capstone.device.infrastructure.util.Message;
+import com.capstone.device.infrastructure.service.CustomerService;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.NonNull;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+
+@Component
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class WaterPriceUseCase {
+  final WaterPriceService waterPriceService;
+  final MessageProducer producer;
+  final CustomerService customerService;
+  static final String PREFIX = ".water-price.";
+
+  @Value("${rabbit-mq-config.queue}" + PREFIX + "${rabbit-mq-config.actions[0]}")
+  String UPDATE_ROUTING_KEY;
+
+  @Value("${rabbit-mq-config.queue}" + PREFIX + "${rabbit-mq-config.actions[1]}")
+  String DELETE_ROUTING_KEY;
+
+  public Page<WaterPriceResponse> getPricesList(@NonNull Pageable pageable, LocalDate filter) {
+    return waterPriceService.getAllWaterPrices(pageable, filter);
+  }
+
+  public WaterPriceResponse createWaterPrice(@NonNull CreateRequest request) {
+    return waterPriceService.createWaterPrice(request);
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public WaterPriceResponse updateWaterPrice(String id, @NonNull UpdateRequest request) {
+    var old = waterPriceService.getWaterPriceById(id);
+    var n = waterPriceService.updateWaterPrice(id, request);
+
+    producer.send(UPDATE_ROUTING_KEY, WaterPriceEvent.builder()
+      .oldUserTarget(old.usageTarget())
+      .oldTax(old.tax())
+      .oldEnvironmentPrice(old.environmentPrice())
+      .oldApplicationPeriod(old.applicationPeriod())
+      .oldExpirationDate(old.expirationDate())
+      .oldDescription(old.description())
+      .newUserTarget(n.usageTarget())
+      .newTax(n.tax())
+      .newEnvironmentPrice(n.environmentPrice())
+      .newApplicationPeriod(n.applicationPeriod())
+      .newExpirationDate(n.expirationDate())
+      .newDescription(n.description())
+      .action("UPDATE")
+      .build());
+
+    return n;
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public void deleteWaterPrice(@NonNull String id) {
+    var status = customerService.checkWhetherCustomersAreApplied(id).data().toString();
+    if (Boolean.parseBoolean(status)) {
+      throw new IllegalArgumentException(Message.ENT_48);
+    }
+
+    var old = waterPriceService.getWaterPriceById(id);
+    waterPriceService.deleteWaterPrice(id);
+
+    producer.send(DELETE_ROUTING_KEY, WaterPriceEvent.builder()
+      .oldUserTarget(old.usageTarget())
+      .oldTax(old.tax())
+      .oldEnvironmentPrice(old.environmentPrice())
+      .oldApplicationPeriod(old.applicationPeriod())
+      .oldExpirationDate(old.expirationDate())
+      .oldDescription(old.description())
+      .action("DELETE")
+      .build());
+  }
+
+  public WaterPriceResponse getWaterPriceById(@NonNull String id) {
+    return waterPriceService.getWaterPriceById(id);
+  }
+}

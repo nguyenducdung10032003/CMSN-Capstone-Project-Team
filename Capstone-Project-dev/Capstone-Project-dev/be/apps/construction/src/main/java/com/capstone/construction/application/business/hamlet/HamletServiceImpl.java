@@ -1,0 +1,128 @@
+package com.capstone.construction.application.business.hamlet;
+
+import com.capstone.common.annotation.AppLog;
+import com.capstone.construction.application.dto.request.hamlet.UpdateHamletRequest;
+import com.capstone.construction.application.dto.response.catalog.HamletResponse;
+import com.capstone.construction.application.dto.response.PageResponse;
+import com.capstone.construction.domain.enumerate.HamletType;
+import com.capstone.construction.domain.model.Hamlet;
+import com.capstone.construction.infrastructure.persistence.HamletRepository;
+import com.capstone.construction.infrastructure.persistence.CommuneRepository;
+import com.capstone.construction.application.exception.ExistingItemException;
+import com.capstone.construction.infrastructure.utils.Message;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@AppLog
+@Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+public class HamletServiceImpl implements HamletService {
+  HamletRepository hamletRepository;
+  CommuneRepository communeRepository;
+  @NonFinal
+  Logger log;
+
+  // Vietnamese accents map for PostgreSQL TRANSLATE (must be same length)
+  private static final String ACCENTED_CHARS = "áàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ";
+  private static final String UNACCENTED_CHARS = "aaaaaaaaaaaaaaaaadeeeeeeeeeeeiiiiiooooooooooooooouuuuuuuuuuuyyyyy";
+
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public HamletResponse createHamlet(String name, HamletType type, String communeId) {
+    log.info("Creating new hamlet with name: {}", name);
+    if (hamletRepository.existsByNameIgnoreCase(name)) {
+      throw new ExistingItemException(String.format(Message.PT_01, name));
+    }
+
+    var commune = communeRepository.findById(communeId)
+      .orElseThrow(() -> new IllegalArgumentException(Message.PT_56));
+
+    var hamlet = Hamlet.create(builder -> builder
+      .name(name)
+      .type(type)
+      .commune(commune));
+
+    var saved = hamletRepository.save(hamlet);
+    return mapToResponse(saved);
+  }
+
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public HamletResponse updateHamlet(String id, @NonNull UpdateHamletRequest request) {
+    log.info("Updating hamlet with id: {}", id);
+    var hamlet = hamletRepository.findById(id)
+      .orElseThrow(() -> new IllegalArgumentException(String.format(Message.PT_62, id)));
+
+    if (!hamlet.getName().equalsIgnoreCase(request.name()) && hamletRepository.existsByNameIgnoreCase(request.name())) {
+      throw new ExistingItemException(String.format(Message.PT_63, request.name()));
+    }
+
+    if (!request.communeId().isBlank()) {
+      var commune = communeRepository.findById(request.communeId())
+        .orElseThrow(() -> new IllegalArgumentException(Message.PT_56));
+      hamlet.setCommune(commune);
+    }
+
+    if (request.name() != null && !request.name().isBlank()) {
+      hamlet.setName(request.name());
+    }
+    if (request.type() != null && !request.type().isBlank()) {
+      hamlet.setType(HamletType.valueOf(request.type()));
+    }
+
+    var saved = hamletRepository.save(hamlet);
+    return mapToResponse(saved);
+  }
+
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public void deleteHamlet(String id) {
+    log.info("Deleting hamlet with id: {}", id);
+    hamletRepository.deleteById(id);
+  }
+
+  @Override
+  public HamletResponse getHamletById(String id) {
+    log.info("Fetching hamlet with id: {}", id);
+    return hamletRepository.findById(id)
+      .map(this::mapToResponse)
+      .orElseThrow(() -> new IllegalArgumentException(String.format(Message.PT_62, id)));
+  }
+
+  @Override
+  public PageResponse<HamletResponse> searchHamlets(String keyword, String communeId, String type, Pageable pageable) {
+    String finalKeyword = (keyword == null || keyword.isBlank()) ? null : keyword;
+    String finalCommuneId = (communeId == null || communeId.isBlank()) ? null : communeId;
+    String finalType = (type == null || type.isBlank()) ? null : type;
+
+    log.info("Searching hamlets, keyword='{}', communeId='{}', type='{}', pageable={}",
+             finalKeyword, finalCommuneId, finalType, pageable);
+
+    var page = hamletRepository.searchHamlets(
+      finalKeyword,
+      finalCommuneId,
+      finalType,
+      ACCENTED_CHARS,
+      UNACCENTED_CHARS,
+      pageable);
+    return PageResponse.fromPage(page, this::mapToResponse);
+  }
+
+  private @NonNull HamletResponse mapToResponse(@NonNull Hamlet hamlet) {
+    return new HamletResponse(
+      hamlet.getHamletId(),
+      hamlet.getName(),
+      hamlet.getType().toString().toLowerCase(),
+      hamlet.getCommune().getCommuneId(),
+      hamlet.getCommune().getName(),
+      hamlet.getCreatedAt());
+  }
+}

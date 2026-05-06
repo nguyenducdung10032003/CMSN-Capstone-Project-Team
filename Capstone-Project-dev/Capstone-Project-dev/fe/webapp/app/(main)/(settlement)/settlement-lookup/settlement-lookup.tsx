@@ -1,0 +1,117 @@
+"use client";
+
+import React, { useState } from "react";
+import { FilterSection } from "@/components/ui/FilterSection";
+import { ResultsTable } from "./components/results-table";
+import { Button, DateValue, Spinner } from "@heroui/react";
+import { PlusIcon } from "@heroicons/react/24/outline";
+import { SettlementFilterRequest, SettlementItem } from "@/types";
+import { useIsITStaff } from "@/hooks/useHasRole";
+import { useEmployeeProfile } from "@/hooks/useEmployeeProfile";
+import { formatDate2 } from "@/utils/format";
+import { useRouter } from "next/navigation";
+import { useProfile } from "@/hooks/useLogin";
+
+const SettlementLookupPage = () => {
+  const { profile, loading: profileLoading, hasRole } = useProfile();
+  const [keyword, setKeyword] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [from, setFrom] = useState<DateValue | null | undefined>(null);
+  const [to, setTo] = useState<DateValue | null | undefined>(null);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [keywordSearch, setKeywordSearch] = useState("");
+
+  const isITStaff = hasRole("it_staff");
+  const isCompanyLeader = hasRole("company_leadership");
+  const isPlanningTechnicalHead = hasRole("planning_technical_department_head");
+  const isOrderReceivingStaff = hasRole("order_receiving_staff");
+  const isSurveyStaff = hasRole("survey_staff");
+  const isConstructionHead = hasRole("construction_department_head");
+  const isConstructionStaff = hasRole("construction_department_staff");
+  const isFinanceStaff = hasRole("finance_department");
+
+  const canView =
+    isConstructionHead ||
+    isConstructionStaff ||
+    isSurveyStaff ||
+    isITStaff ||
+    isCompanyLeader ||
+    isPlanningTechnicalHead;
+
+  const router = useRouter();
+
+  const handleSearch = () => {
+    setKeywordSearch(keywordInput);
+  };
+
+  const handleReload = () => setReloadKey((prev) => prev + 1);
+
+  const handleAddNew = () => {
+    router.push("/settlement/run/new");
+  };
+
+  const handleEdit = (item: SettlementItem) => {
+    const settlementId = item.id || item.settlementId;
+    if (settlementId) {
+      router.push(`/settlement/run/${settlementId}`);
+    }
+  };
+
+  if (!profile) {
+    return <p>Không thể tải thông tin người dùng</p>;
+  }
+  if (!canView) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-500 mb-2">
+            Không có quyền truy cập
+          </h2>
+          <p className="text-gray-600">
+            Bạn không có quyền xem trang này. Vui lòng liên hệ quản trị viên.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  const canCreateSettlement = profile?.role === "construction_department_staff";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Quản lý quyết toán công trình
+        </h1>
+        {canCreateSettlement && (
+          <Button
+            color="primary"
+            startContent={<PlusIcon className="w-5 h-5" />}
+            onPress={handleAddNew}
+          >
+            Tạo quyết toán mới
+          </Button>
+        )}
+      </div>
+      <FilterSection
+        from={from}
+        keyword={keywordInput}
+        setFromAction={setFrom}
+        setKeywordAction={setKeywordInput}
+        setToAction={setTo}
+        title="Tra cứu đơn"
+        to={to}
+        onSearch={handleSearch}
+      />
+      <ResultsTable
+        keyword={keywordSearch}
+        reloadKey={reloadKey}
+        from={formatDate2(from)}
+        to={formatDate2(to)}
+        onEdit={handleEdit}
+        onDeleted={handleReload}
+      />
+    </div>
+  );
+};
+
+export default SettlementLookupPage;
